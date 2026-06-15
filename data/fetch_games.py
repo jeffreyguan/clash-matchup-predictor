@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-env_path = Path(__file__).parent / "data" / ".env"
+env_path = Path(__file__).parent.parent / ".env"
 API_TOKEN = None
 with open(env_path) as f:
     for line in f:
@@ -193,7 +193,7 @@ def battle_key(battle):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    output_path = Path("data") / "games.json"
+    output_path = Path(__file__).parent / "games.json"
     output_path.parent.mkdir(exist_ok=True)
 
     # Step 1 — find current season
@@ -253,9 +253,17 @@ def main():
         f"(UC = leagueNumber {uc_league_num})"
     )
 
-    # Step 4 — fetch battle logs
-    seen: set = set()
+    # Step 4 — fetch battle logs, accumulating into the existing dataset
     battles: list[dict] = []
+    seen: set = set()
+
+    if output_path.exists():
+        with open(output_path, encoding="utf-8") as f:
+            battles = json.load(f)
+        seen = {battle_key(b) for b in battles}
+        log.info(f"Loaded {len(battles)} existing battles from {output_path}")
+
+    new_count = 0
     skipped = 0
 
     for tag in tqdm(list(accepted.keys()), desc="Fetching battle logs"):
@@ -267,9 +275,13 @@ def main():
             if key not in seen:
                 seen.add(key)
                 battles.append(b)
+                new_count += 1
         time.sleep(RATE_LIMIT_DELAY)
 
-    log.info(f"PoL battles collected: {len(battles)} unique  ({skipped} non-PoL skipped)")
+    log.info(
+        f"Added {new_count} new PoL battles ({skipped} non-PoL skipped); "
+        f"{len(battles)} total in dataset"
+    )
 
     # Step 5 — save
     with open(output_path, "w", encoding="utf-8") as f:
