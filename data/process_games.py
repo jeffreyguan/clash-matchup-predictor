@@ -3,11 +3,13 @@ Process games.json into a compact dataset: card IDs (no support cards) + winner.
 
 Output: processed_games.csv
   Columns: team_0..team_7, opp_0..opp_7, winner
-  Card IDs are remapped to sequential integers (0-based, sorted by original ID).
+  Card IDs are remapped to sequential integers starting at 1 (sorted by
+  original ID); index 0 is reserved as the mask token for pretraining.
   winner: 0 = team, 1 = opponent. Draws (trophyChange == 0) are skipped.
 
 Output: card_map.csv
   Columns: original_id, card_id  (lookup table for the remapped integers)
+  Includes a leading MASK row (original_id -1, card_id 0).
 """
 
 import csv
@@ -45,7 +47,8 @@ def main():
         all_ids.update(get_card_ids(team))
         all_ids.update(get_card_ids(opponent))
 
-    card_map: dict[int, int] = {cid: idx for idx, cid in enumerate(sorted(all_ids))}
+    # Real cards start at 1; index 0 is reserved as the mask token.
+    card_map: dict[int, int] = {cid: idx + 1 for idx, cid in enumerate(sorted(all_ids))}
 
     # Second pass: build processed game records
     games = []
@@ -85,6 +88,7 @@ def main():
     with open(CARD_MAP_OUTPUT, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["original_id", "card_id"])
+        writer.writerow([-1, 0])  # MASK token (reserved index 0)
         for orig, remapped in card_map.items():
             writer.writerow([orig, remapped])
 

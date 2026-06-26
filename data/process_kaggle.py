@@ -22,15 +22,16 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent
 INPUT_GLOB = str(DATA_DIR / "kaggle" / "**" / "*.csv")  # recurse into date folders
 CARD_MAP = DATA_DIR / "card_map.csv"
-OUTPUT = DATA_DIR / "processed_games.csv"
+OUTPUT = DATA_DIR / "processed_games_s53.csv"  # separate from the API-derived file
 
 TEAM_CARDS = slice(5, 13)
 OPP_CARDS = slice(16, 24)
 TEAM_CROWNS = 4
 OPP_CROWNS = 15
 
-# Optional cap on total games written (None = no limit). Useful for a quick subset.
-MAX_GAMES = None
+# Cap on total games written. The season has ~40M rows, so we sample evenly
+# across all days (every Nth row) rather than taking the first ones.
+MAX_GAMES = 5_000_000
 
 
 def load_card_map(path):
@@ -47,6 +48,16 @@ def determine_winner(team_crowns, opp_crowns):
     return None  # draw
 
 
+def count_rows(files):
+    """Fast newline count across all files (files have no header)."""
+    total = 0
+    for fp in files:
+        with open(fp, "rb") as f:
+            while chunk := f.read(1 << 20):
+                total += chunk.count(b"\n")
+    return total
+
+
 def main():
     card_map = load_card_map(CARD_MAP)
 
@@ -54,7 +65,13 @@ def main():
     if not files:
         raise SystemExit(f"No CSVs found under {INPUT_GLOB} — download the dataset first.")
 
+    # Stride for even, season-wide sampling: keep every Nth row across all days.
+    total_rows = count_rows(files)
+    stride = max(1, total_rows // MAX_GAMES) if MAX_GAMES else 1
+    print(f"Total rows: {total_rows:,}  ->  sampling every {stride} row(s)")
+
     games = []
+    seen = 0          # raw rows scanned (drives the stride)
     skipped_draws = 0
     skipped_unknown = 0
 
@@ -62,6 +79,9 @@ def main():
         with open(fp, newline="", encoding="utf-8") as f:
             for row in csv.reader(f):
                 if len(row) < 24:
+                    continue
+                seen += 1
+                if seen % stride != 0:
                     continue
 
                 winner = determine_winner(int(row[TEAM_CROWNS]), int(row[OPP_CROWNS]))

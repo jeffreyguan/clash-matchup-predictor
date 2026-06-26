@@ -1,6 +1,7 @@
 .env
 venv/
 logs/
+scripts/
 *.pth
 __pycache__/
 data/games.json
