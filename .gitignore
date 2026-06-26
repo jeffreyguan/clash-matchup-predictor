@@ -6,3 +6,4 @@ __pycache__/
 data/games.json
 data/processed_games.json
 data/processed_games.csv
+data/kaggle/

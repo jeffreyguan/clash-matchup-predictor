@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from model import MatchupModel
+from old_model import MatchupModel
 
 DATA_DIR = Path(__file__).parent / "data"
 MODEL_PATH = Path(__file__).parent / "src" / "model_best.pth"
