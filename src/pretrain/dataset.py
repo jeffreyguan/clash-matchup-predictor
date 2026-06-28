@@ -35,12 +35,12 @@ class PretrainDataset(Dataset):
         labels[idx] = deck[idx]
         
         for i in idx:
-            r = torch.rand(1, generator=generator).item()
+            r = torch.rand(1, generator=generator).item()                                 # bert 80/10/10 split
             if r < 0.8:
                 input_ids[i] = self.mask_idx                                              # 80% mask
             elif r < 0.9:
                 input_ids[i] = torch.randint(1, self.numcards, (1,), generator=generator) # 10% random card
             else:
-                input_ids[i] = deck[i]                                                    
+                input_ids[i] = deck[i]                                                    # 10% same card                               
 
         return (input_ids, labels)

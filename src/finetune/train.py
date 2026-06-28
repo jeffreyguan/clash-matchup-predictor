@@ -78,7 +78,7 @@ def load_card_features(path):
 
 if __name__ == "__main__":
     train_loader, val_loader, test_loader, pos_weight = load_data("../data/processed_games.csv", test_size=0.2, batch_size=32)
-    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+    device = torch.accelerator.current_accelerator() if torch.accelerator.is_available() else "cpu"
     card_features = load_card_features("../data/card_features.csv").to(device)
     model = MatchupModel(num_cards=len(pd.read_csv("../data/card_map.csv")), embedding_dim=8, card_features=card_features).to(device)
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(device))
