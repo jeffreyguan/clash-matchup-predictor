@@ -37,23 +37,20 @@ def train_loop(dataloader, model, loss_fn, optimizer):
 
 def test_loop(dataloader, model, loss_fn):
     model.eval()
-    test_loss = 0
-    correct, total = 0, 0
+    test_loss, correct, total = 0, 0, 0
     with torch.no_grad():
         for x_batch, y_batch in dataloader:
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
             preds = model(x_batch)
-            loss = loss_fn(preds.reshape(-1, 122), y_batch.reshape(-1))
-            test_loss += loss.item()
+            test_loss += loss_fn(preds.reshape(-1, 122), y_batch.reshape(-1)).item()
 
-            masks = y_batch != -100
-            correct += (preds.argmax(-1)[masks] == y_batch[masks]).sum().item()
-            total += masks.sum().item()
-
+            mask = y_batch != -100
+            pred_ids = preds.argmax(-1)
+            correct += (pred_ids[mask] == y_batch[mask]).sum().item()
+            total += mask.sum().item()
     avg_loss = test_loss / len(dataloader)
-    print(f"  Val Loss:   {avg_loss:.4f}")
-    accuracy = correct / total
-    print(f"  Val Accuracy: {accuracy:.4f}")
+    print(f"  Test Loss:   {avg_loss:.4f}")
+    print(f"  Test Accuracy: {correct / total:.4f}")
     return avg_loss
 
 if __name__ == "__main__":
