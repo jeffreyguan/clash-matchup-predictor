@@ -1,6 +1,5 @@
 import torch
-import pandas as pd
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 class PretrainDataset(Dataset):
     def __init__(self, data, n_mask=1, mask_idx=0, ignore_idx = -100, numcards=122, train=True):
@@ -15,9 +14,10 @@ class PretrainDataset(Dataset):
         self.train = train
 
         if not self.train:
-            g = torch.Generator().manual_seed(0)          # seed -> reproducible val masks
-            self.examples = [self._maskdeck(deck, generator=g) for deck in self.decks]
-
+            g = torch.Generator().manual_seed(0)         
+            pairs = [self._maskdeck(deck, generator=g) for deck in self.decks]
+            self.val_inputs = torch.stack([p[0] for p in pairs])   # [V, 8]
+            self.val_labels = torch.stack([p[1] for p in pairs])   # [V, 8]
 
     def __len__(self):
         return len(self.decks)
@@ -25,7 +25,7 @@ class PretrainDataset(Dataset):
     def __getitem__(self, idx):
         if self.train:
             return self._maskdeck(self.decks[idx])    
-        return self.examples[idx]                     
+        return (self.val_inputs[idx], self.val_labels[idx])                
 
 
     def _maskdeck(self, deck, generator=None):

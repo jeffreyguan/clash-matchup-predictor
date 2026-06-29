@@ -1,12 +1,11 @@
 import torch
 import csv
-import pandas as pd
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from dataset import PretrainDataset
 from model import DeckTransformer
 
-def load_data(path, test_size=0.2, batch_size=128):
+def load_data(path, test_size=0.05, batch_size=512):
     with open(path, newline='') as f:
         reader = csv.reader(f)
         next(reader)  # skip header
@@ -16,12 +15,10 @@ def load_data(path, test_size=0.2, batch_size=128):
     train_data, test_data = train_test_split(data, test_size=test_size, random_state=67)
 
     train_dataset = PretrainDataset(train_data)
-    test_dataset = PretrainDataset(test_data)
+    test_dataset = PretrainDataset(test_data, train=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    labels = [row[-1] for row in train_data]
 
     return train_loader, test_loader
 
@@ -63,5 +60,30 @@ if __name__ == "__main__":
     device = torch.accelerator.current_accelerator() if torch.accelerator.is_available() else "cpu"
     train_loader, test_loader = load_data("../../data/processed_games_s53.csv")
     model = DeckTransformer().to(device)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters())
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-100)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+
+    best_test_loss = float('inf')
+    patience, wait = 5, 0
+
+    epochs = 15
+    for t in range(epochs):
+        print(f"Epoch {t+1}\n-------------------------------")
+        train_loop(train_loader, model, loss_fn, optimizer)
+        test_loss = test_loop(test_loader, model, loss_fn)
+
+        if test_loss < best_test_loss:
+            best_test_loss = test_loss
+            torch.save({
+                'epoch': t,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_test_loss': best_test_loss
+            }, '../../checkpoints/ckpt_best.pth')
+
+            wait = 0
+        else:
+            wait += 1
+            if wait >= patience:
+                print(f"Early stopping at epoch {t+1}")
+                break
