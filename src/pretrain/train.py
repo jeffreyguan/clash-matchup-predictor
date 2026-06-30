@@ -63,7 +63,7 @@ if __name__ == "__main__":
     best_test_loss = float('inf')
     patience, wait = 5, 0
 
-    epochs = 15
+    epochs = 20
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
         train_loop(train_loader, model, loss_fn, optimizer)
