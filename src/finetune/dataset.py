@@ -1,10 +1,10 @@
 import torch
 from torch.utils.data import Dataset
 
-class GameDataset(Dataset):
+class FinetuneDataset(Dataset):
     def __init__(self, data):
         self.features = torch.tensor(
-            [sorted(item[:8]) + sorted(item[8:16]) for item in data],
+            [item[:8] + item[8:16] for item in data],
             dtype=torch.long
         )
         self.labels = torch.tensor([item[-1] for item in data], dtype=torch.float)

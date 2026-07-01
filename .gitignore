@@ -8,3 +8,6 @@ data/games.json
 data/processed_games.json
 data/processed_games.csv
 data/kaggle/
+data/
+checkpoints/
+logs.txt

@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent / "src"))
+sys.path.append(str(Path(__file__).parent / "src" / "finetune"))
 
 import csv
 import torch
@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from old_model import MatchupModel
+from model import MatchupModel
 
 DATA_DIR = Path(__file__).parent / "data"
 MODEL_PATH = Path(__file__).parent / "src" / "model_best.pth"

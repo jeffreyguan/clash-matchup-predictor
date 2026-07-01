@@ -5,8 +5,8 @@ import csv
 import pandas as pd
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
-from dataset import GameDataset
-from old_model import MatchupModel
+from dataset import FinetuneDataset
+from model import MatchupPredictor
 
 def augment(data):
     augmented = []
@@ -28,9 +28,9 @@ def load_data(path, test_size=0.2, batch_size=128):
 
     train_data = augment(train_data)
 
-    train_dataset = GameDataset(train_data)
-    val_dataset = GameDataset(val_data)
-    test_dataset = GameDataset(test_data)
+    train_dataset = FinetuneDataset(train_data)
+    val_dataset = FinetuneDataset(val_data)
+    test_dataset = FinetuneDataset(test_data)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     train_loader, val_loader, test_loader, pos_weight = load_data("../data/processed_games.csv", test_size=0.2, batch_size=32)
     device = torch.accelerator.current_accelerator() if torch.accelerator.is_available() else "cpu"
     card_features = load_card_features("../data/card_features.csv").to(device)
-    model = MatchupModel(num_cards=len(pd.read_csv("../data/card_map.csv")), embedding_dim=8, card_features=card_features).to(device)
+    model = MatchupPredictor(num_cards=len(pd.read_csv("../data/card_map.csv")), embedding_dim=8, card_features=card_features).to(device)
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(device))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
