@@ -12,7 +12,7 @@ import streamlit as st
 from model import MatchupModel
 
 DATA_DIR = Path(__file__).parent / "data"
-MODEL_PATH = Path(__file__).parent / "src" / "model_best.pth"
+MODEL_PATH = Path(__file__).parent / "src/model_best.pty"
 
 
 @st.cache_resource

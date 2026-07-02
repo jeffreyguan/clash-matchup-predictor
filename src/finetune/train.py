@@ -68,7 +68,8 @@ def test_loop(dataloader, model, loss_fn):
 if __name__ == "__main__":
     train_loader, val_loader, test_loader = load_data("../../data/processed_games_s84.csv", test_size=0.2, batch_size=512)
     device = torch.accelerator.current_accelerator() if torch.accelerator.is_available() else "cpu"
-    model = MatchupPredictor(pretrain_path="../../checkpoints/ckpt_best.pth").to(device)
+    # model = MatchupPredictor(pretrain_path="../../checkpoints/ckpt_best.pth").to(device)
+    model = MatchupPredictor().to(device)
     loss_fn = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.AdamW([
         {"params": model.embedding.parameters(),   "lr": 1e-4},
