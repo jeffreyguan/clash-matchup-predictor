@@ -2,7 +2,6 @@ import sys
 sys.path.append("..")
 import torch
 import csv
-import pandas as pd
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from dataset import FinetuneDataset
@@ -36,12 +35,7 @@ def load_data(path, test_size=0.2, batch_size=128):
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    labels = [row[-1] for row in train_data]
-    n_losses = sum(1 for l in labels if l == 0)
-    n_wins   = sum(1 for l in labels if l == 1)
-    pos_weight = torch.tensor([n_losses / n_wins])
-
-    return train_loader, val_loader, test_loader, pos_weight
+    return train_loader, val_loader, test_loader
 
 def train_loop(dataloader, model, loss_fn, optimizer):
     model.train()
@@ -58,31 +52,29 @@ def train_loop(dataloader, model, loss_fn, optimizer):
 
 def test_loop(dataloader, model, loss_fn):
     model.eval()
-    test_loss = 0
+    test_loss, correct, total = 0, 0, 0
     with torch.no_grad():
         for x_batch, y_batch in dataloader:
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
             preds = model(x_batch)
-            loss = loss_fn(preds, y_batch)
-            test_loss += loss.item()
+            test_loss += loss_fn(preds, y_batch).item()
+            correct += ((preds > 0).float() == y_batch).sum().item()
+            total += y_batch.numel()
     avg_loss = test_loss / len(dataloader)
     print(f"  Val Loss:   {avg_loss:.4f}")
-    correct = (preds.round() == y_batch).float().sum()
-    accuracy = correct / len(y_batch)
-    print(f"  Val Accuracy: {accuracy:.4f}")
+    print(f"  Val Accuracy: {correct / total:.4f}")
     return avg_loss
 
-def load_card_features(path):
-    df = pd.read_csv(path).sort_values("card_id")
-    return torch.tensor(df[["elixir_cost"]].values, dtype=torch.float)
-
 if __name__ == "__main__":
-    train_loader, val_loader, test_loader, pos_weight = load_data("../data/processed_games.csv", test_size=0.2, batch_size=32)
+    train_loader, val_loader, test_loader = load_data("../../data/processed_games_s84.csv", test_size=0.2, batch_size=512)
     device = torch.accelerator.current_accelerator() if torch.accelerator.is_available() else "cpu"
-    card_features = load_card_features("../data/card_features.csv").to(device)
-    model = MatchupPredictor(num_cards=len(pd.read_csv("../data/card_map.csv")), embedding_dim=8, card_features=card_features).to(device)
-    loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(device))
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    model = MatchupPredictor(pretrain_path="../../checkpoints/ckpt_best.pth").to(device)
+    loss_fn = torch.nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.AdamW([
+        {"params": model.embedding.parameters(),   "lr": 1e-4},
+        {"params": model.transformer.parameters(), "lr": 1e-4},
+        {"params": model.network.parameters(),     "lr": 1e-3},
+    ], weight_decay=1e-4)
 
     best_val_loss = float('inf')
     patience, wait = 5, 0
@@ -106,6 +98,3 @@ if __name__ == "__main__":
     print("\nTesting on the test set...")
     model.load_state_dict(torch.load('model_best.pth'))
     test_loop(test_loader, model, loss_fn)
-
-    torch.save(model.state_dict(), 'model.pth')
-    print("Model saved!")
