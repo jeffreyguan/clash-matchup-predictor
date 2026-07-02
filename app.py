@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent / "src" / "finetune"))
+sys.path.append(str(Path(__file__).parent / "src"))  # so model.py can import pretrain.model
 
 import csv
 import torch
@@ -9,10 +10,10 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from model import MatchupModel
+from model import MatchupPredictor
 
 DATA_DIR = Path(__file__).parent / "data"
-MODEL_PATH = Path(__file__).parent / "src/model_best.pty"
+MODEL_PATH = Path(__file__).parent / "checkpoints/pretrained_model_best.pth"
 
 
 @st.cache_resource
@@ -20,10 +21,8 @@ def load_model_and_cards():
     card_map_df = pd.read_csv(DATA_DIR / "card_map.csv")
     num_cards = len(card_map_df)
 
-    card_features_df = pd.read_csv(DATA_DIR / "card_features.csv").sort_values("card_id")
-    card_features = torch.tensor(card_features_df[["elixir_cost"]].values, dtype=torch.float)
-
-    model = MatchupModel(num_cards=num_cards, embedding_dim=8, card_features=card_features)
+    # pretrain_path=None: build the architecture only, then load the finetuned weights.
+    model = MatchupPredictor(num_cards=num_cards)
     model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
     model.eval()
 
@@ -31,7 +30,7 @@ def load_model_and_cards():
     orig_to_card_id = dict(zip(card_map_df["original_id"], card_map_df["card_id"]))
     card_names = {}  # card_id -> name
 
-    env_path = DATA_DIR / ".env"
+    env_path = Path(__file__).parent / ".env"
     api_token = None
     if env_path.exists():
         with open(env_path) as f:
@@ -64,11 +63,14 @@ def load_model_and_cards():
 
 
 def predict(model, blue_ids, red_ids):
+    # Blue occupies the team slots (0-7), red the opponent slots (8-15).
+    # The model is trained on winner labels where 1 = opponent wins, so
+    # sigmoid(logit) is P(red wins); blue's win probability is the complement.
     x = torch.tensor([sorted(blue_ids) + sorted(red_ids)], dtype=torch.long)
     with torch.no_grad():
         logit = model(x)
-    prob = torch.sigmoid(logit).item()
-    return prob
+    red_win_prob = torch.sigmoid(logit).item()
+    return 1 - red_win_prob
 
 
 def main():
@@ -77,7 +79,7 @@ def main():
 
     model, card_names, num_cards = load_model_and_cards()
 
-    options = [card_names[i] for i in range(num_cards)]
+    options = [card_names[i] for i in range(1, num_cards)]  # skip card 0 (mask token, not a real card)
     name_to_id = {v: k for k, v in card_names.items()}
 
     col1, col2 = st.columns(2)
